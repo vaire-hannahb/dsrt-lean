@@ -1,0 +1,10 @@
+name = "DsrtLean"
+version = "0.1.0"
+defaultTargets = ["dsrtlean"]
+
+[[lean_lib]]
+name = "DsrtLean"
+
+[[lean_exe]]
+name = "dsrtlean"
+root = "Main"
