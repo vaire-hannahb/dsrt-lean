@@ -8,3 +8,7 @@ name = "DsrtLean"
 [[lean_exe]]
 name = "dsrtlean"
 root = "Main"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
