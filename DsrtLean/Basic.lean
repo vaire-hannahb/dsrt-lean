@@ -81,9 +81,8 @@ structure State (net : Net) where
 def Transistor.endpoints (T : Transistor nodes) (a b : nodes) : Prop :=
   (T.source = a ∧ T.drain = b) ∨ (T.source = b ∧ T.drain = a)
 
--- Two nodes are connected when you can walk between them across transistors
--- in the net that satisfy `active`. Parameterised over the predicate so the
--- same definition covers A-connected, B-connected, and AB-connected.
+-- Two nodes are connected when you can walk between them across transistors in the net that satisfy `active`.
+-- Same definition covers A-connected, B-connected, and AB-connected.
 inductive Connected (net : Net) (active : Transistor net.nodes → Prop) :
     net.nodes → net.nodes → Prop where
   | refl (v : net.nodes) :
@@ -96,16 +95,22 @@ inductive Connected (net : Net) (active : Transistor net.nodes → Prop) :
 /-! ## Constraints -/
 
 -- CON(A, B): B-connected nodes have the same logical value in B.
--- Note: A is unused here — included to match the paper's convention of stating
--- all constraints as properties of state pairs.
--- Uses logical equality (not exact Value equality) because pass degrades strength.
+-- TODO A isn't used here, should it be? Doing it like this so it matches the paper, for now.
 def CON {net : Net} (_A B : State net) : Prop :=
   ∀ u v, Connected net (fun T => T.isOn B.map) u v →
     logic (B.map u) = logic (B.map v)
 
+-- REV0(A, B): weak reversibility. If a transistor's gate changes logically between A and B, its endpoints must agree in A and agree in B.
+-- TODO: should endpoint comparison be logical equality or exact Value equality? As far as I remember, this was supposed to be literal since we're talking about a charging over a literal transistor gate, which is dangerous, not the natural roundoff and current to zero as you turn off a transistor.
+def REV0 {net : Net} (A B : State net) : Prop :=
+  ∀ T ∈ net.transistors,
+    logic (A.map T.gate) ≠ logic (B.map T.gate) →
+      A.map T.source = A.map T.drain ∧
+      B.map T.source = B.map T.drain
+
 /-! ## Proof outline
 
--- define REV0, REV1, STAT
+-- define REV1, STAT
 
 -- define CAP, DDC
 
