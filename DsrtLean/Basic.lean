@@ -1,16 +1,13 @@
 import Mathlib.Data.Finset.Basic
 
-/-! # Basic Definitions
-
-Structures and functions for the DSRT transistor semantics.
-No theorems here — just the vocabulary. -/
+/-! # Basic Definitions -/
 
 -- Signal strength values present on nodes
 inductive Value where
-  | strong_low   -- 0: driven low by power rail or pMOS
-  | weak_low     -- L: degraded low through nMOS
-  | weak_high    -- H: degraded high through pMOS
-  | strong_high  -- 1: driven high by power rail or nMOS
+  | strong_low   -- 0
+  | weak_low     -- L
+  | weak_high    -- H
+  | strong_high  -- 1
   deriving Repr, DecidableEq
 
 -- Logical interpretation of a signal value
@@ -72,17 +69,43 @@ def pass : TransistorType → Value → Value
 
 /-! ## State -/
 
--- A well-formed snapshot of the net at a single timestep
+-- Snapshot of the net at a single timestep
 structure State (net : Net) where
   map : net.nodes → Value
   powered : net.nodes → Option Value
   powered_consistent : ∀ v val, powered v = some val → map v = val
 
+/-! ## Connectivity -/
+
+-- The two endpoints of a transistor, ignoring which is source and which is drain
+def Transistor.endpoints (T : Transistor nodes) (a b : nodes) : Prop :=
+  (T.source = a ∧ T.drain = b) ∨ (T.source = b ∧ T.drain = a)
+
+-- Two nodes are connected when you can walk between them across transistors
+-- in the net that satisfy `active`. Parameterised over the predicate so the
+-- same definition covers A-connected, B-connected, and AB-connected.
+inductive Connected (net : Net) (active : Transistor net.nodes → Prop) :
+    net.nodes → net.nodes → Prop where
+  | refl (v : net.nodes) :
+      Connected net active v v
+  | step {a b c : net.nodes}
+      (h : ∃ T ∈ net.transistors, active T ∧ T.endpoints a b)
+      (rest : Connected net active b c) :
+      Connected net active a c
+
+/-! ## Constraints -/
+
+-- CON(A, B): B-connected nodes have the same logical value in B.
+-- Note: A is unused here — included to match the paper's convention of stating
+-- all constraints as properties of state pairs.
+-- Uses logical equality (not exact Value equality) because pass degrades strength.
+def CON {net : Net} (_A B : State net) : Prop :=
+  ∀ u v, Connected net (fun T => T.isOn B.map) u v →
+    logic (B.map u) = logic (B.map v)
+
 /-! ## Proof outline
 
--- define connectivity in a state
-
--- define CON, REV0, REV1, STAT
+-- define REV0, REV1, STAT
 
 -- define CAP, DDC
 
