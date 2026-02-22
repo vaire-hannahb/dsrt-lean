@@ -92,13 +92,20 @@ inductive Connected (net : Net) (active : Transistor net.nodes → Prop) :
       (rest : Connected net active b c) :
       Connected net active a c
 
+-- S-connected: connected through transistors on in state S
+def ConnectedIn {net : Net} (S : State net) :=
+  Connected net (fun T => T.isOn S.val)
+
+-- AB-connected: connected through transistors on in either A or B
+def ABConnected {net : Net} (A B : State net) :=
+  Connected net (fun T => T.isOn A.val ∨ T.isOn B.val)
+
 /-! ## Constraints -/
 
 -- CON(A, B): B-connected nodes have the same logical value in B.
 -- TODO A isn't used here, should it be? Doing it like this so it matches the paper, for now.
 def CON {net : Net} (_A B : State net) : Prop :=
-  ∀ u v, Connected net (fun T => T.isOn B.val) u v →
-    logic (B.val u) = logic (B.val v)
+  ∀ u v, ConnectedIn B u v → logic (B.val u) = logic (B.val v)
 
 -- REV0(A, B): weak reversibility. If a transistor's gate changes logically between A and B, its endpoints must agree in A and agree in B.
 -- TODO: should endpoint comparison be logical equality or exact Value equality? As far as I remember, this was supposed to be literal since we're talking about a charging over a literal transistor gate, which is dangerous, not the natural roundoff and current to zero as you turn off a transistor.
@@ -111,14 +118,16 @@ def REV0 {net : Net} (A B : State net) : Prop :=
 -- REV1(A, B): path-to-charge. If a node changes between A and B, it must be AB-connected to a node powered in A, and AB-connected to a node powered in B.
 -- TODO: should the change comparison be literal or logical? Using literal for now: even a strength change (e.g. 1→H) is a physical event that needs a charge path.
 def REV1 {net : Net} (A B : State net) : Prop :=
-  let ab_connected := Connected net (fun T => T.isOn A.val ∨ T.isOn B.val)
   ∀ v : net.nodes, A.val v ≠ B.val v →
-    (∃ p, A.powered p ≠ none ∧ ab_connected v p) ∧
-    (∃ q, B.powered q ≠ none ∧ ab_connected v q)
+    (∃ p, A.powered p ≠ none ∧ ABConnected A B v p) ∧
+    (∃ q, B.powered q ≠ none ∧ ABConnected A B v q)
+
+-- STAT(A, B): static operation. Every node in B is B-connected to a B-powered node.
+-- TODO A isn't used here, should it be? Doing it like this so it matches the paper, for now.
+def STAT {net : Net} (_A B : State net) : Prop :=
+  ∀ v : net.nodes, ∃ p, B.powered p ≠ none ∧ ConnectedIn B v p
 
 /-! ## Proof outline
-
--- define STAT
 
 -- define CAP, DDC
 
