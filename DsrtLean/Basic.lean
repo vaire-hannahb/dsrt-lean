@@ -127,13 +127,31 @@ def REV1 {net : Net} (A B : State net) : Prop :=
 def STAT {net : Net} (_A B : State net) : Prop :=
   ∀ v : net.nodes, ∃ p, B.powered p ≠ none ∧ ConnectedIn B v p
 
+/-! ## Derived lemmas -/
+
+-- CAP (connected-are-powered): if v is A-connected to a B-powered node p, then B(v) = B(p).
+def CAP {net : Net} (A B : State net) : Prop :=
+  ∀ v p : net.nodes, ConnectedIn A v p → B.powered p ≠ none → B.val v = B.val p
+
+-- DDC (disconnected-don't-change): if v is A-disconnected from every B-powered node, then A(v) = B(v).
+def DDC {net : Net} (A B : State net) : Prop :=
+  ∀ v : net.nodes,
+    (∀ p : net.nodes, B.powered p ≠ none → ¬ ConnectedIn A v p) →
+    A.val v = B.val v
+
+/-! ## Proof that lemmas follow from constraints -/
+
+-- CON ∧ REV0 implies CAP.
+theorem con_rev0_implies_cap {net : Net} (A B : State net)
+    (hCON : CON A B) (hREV0 : REV0 A B) : CAP A B := by
+  sorry
+
+-- REV1 implies DDC.
+theorem rev1_implies_ddc {net : Net} (A B : State net)
+    (hREV1 : REV1 A B) : DDC A B := by
+  sorry
+
 /-! ## Proof outline
-
--- define CAP, DDC
-
--- show CON ∧ REV0 ∧ REV1 -> CAP
-
--- show CON ∧ REV0 ∧ REV1 -> DDC
 
 -- show CAP ∧ REV0 ∧ REV1 -> CON
 
