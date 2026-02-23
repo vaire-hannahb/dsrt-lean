@@ -127,6 +127,10 @@ def REV1 {net : Net} (A B : State net) : Prop :=
 def STAT {net : Net} (_A B : State net) : Prop :=
   ∀ v : net.nodes, ∃ p, B.powered p ≠ none ∧ ConnectedIn B v p
 
+-- CLEAN(A, B): every node in B has a strong (non-degraded) value.
+def CLEAN {net : Net} (_A B : State net) : Prop :=
+  ∀ v : net.nodes, B.val v = .strong_low ∨ B.val v = .strong_high
+
 /-! ## Derived lemmas -/
 
 -- CAP (connected-are-powered): if v is A-connected to a B-powered node p, then logic(B(v)) = logic(B(p)).
@@ -237,9 +241,17 @@ theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
     obtain ⟨T, hT_mem, hT_on_B, hT_ends⟩ := h
     exact (step_logic_eq A B hCON_A hCAP hREV0 hDDC T hT_mem hT_on_B hT_ends).trans ih
 
+-- Uniqueness: if (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same powered values, then B and C are identical on every node.
+theorem uniqueness {net : Net} (A B C : State net)
+    (hpow     : B.powered = C.powered)
+    (hDDC_B   : DDC A B) (hCAP_B : CAP A B) (hCLEAN_B : CLEAN A B)
+    (hDDC_C   : DDC A C) (hCAP_C : CAP A C) (hCLEAN_C : CLEAN A C) :
+    ∀ v : net.nodes, B.val v = C.val v := by
+  sorry
+
 /-! ## Proof outline
 
--- show uniqueness: if A, B and A, C both satisfy DDC and CAP, then B = C
+-- define dsrt_sim(A, powered) as a function implementing the simulation algorithm
 
 -- define dsrt_sim(A, powered) as a function implementing the simulation algorithm
 
