@@ -129,9 +129,10 @@ def STAT {net : Net} (_A B : State net) : Prop :=
 
 /-! ## Derived lemmas -/
 
--- CAP (connected-are-powered): if v is A-connected to a B-powered node p, then B(v) = B(p).
+-- CAP (connected-are-powered): if v is A-connected to a B-powered node p, then logic(B(v)) = logic(B(p)).
+-- Note: only logical equality, not value equality — pass degrades strength so exact equality fails.
 def CAP {net : Net} (A B : State net) : Prop :=
-  ∀ v p : net.nodes, ConnectedIn A v p → B.powered p ≠ none → B.val v = B.val p
+  ∀ v p : net.nodes, ConnectedIn A v p → B.powered p ≠ none → logic (B.val v) = logic (B.val p)
 
 -- DDC (disconnected-don't-change): if v is A-disconnected from every B-powered node, then A(v) = B(v).
 def DDC {net : Net} (A B : State net) : Prop :=
@@ -142,14 +143,46 @@ def DDC {net : Net} (A B : State net) : Prop :=
 /-! ## Proof that lemmas follow from constraints -/
 
 -- CON ∧ REV0 implies CAP.
+-- Proof: induction on the A-connection path from v to p.
+--   Base case: v = p, trivial.
+--   Inductive step: transistor T connects v to some intermediate node b, which is A-connected to p.
+--     If T is on in B: v and b are B-connected, so CON gives logic(B(v)) = logic(B(b)).
+--     If T is off in B: gate changed A→B, so REV0 gives B(T.source) = B(T.drain).
+--   Chain with the IH (logic(B(b)) = logic(B(p))) in both cases.
 theorem con_rev0_implies_cap {net : Net} (A B : State net)
     (hCON : CON A B) (hREV0 : REV0 A B) : CAP A B := by
-  sorry
+  intro v p hconn
+  induction hconn with
+  | refl => intro _; rfl
+  | step h rest ih =>
+    intro hpow
+    obtain ⟨T, hT_mem, hT_on_A, hT_ends⟩ := h
+    by_cases hT_on_B : T.isOn B.val
+    · -- T still on in B: v and the next node are B-connected, CON applies
+      have hB_conn : ConnectedIn B _ _ :=
+        Connected.step ⟨T, hT_mem, hT_on_B, hT_ends⟩ (Connected.refl _)
+      exact (hCON _ _ hB_conn).trans (ih hpow)
+    · -- T switched off A→B: gate changed logically, so REV0 gives B-value equality at endpoints
+      have hgate : logic (A.val T.gate) ≠ logic (B.val T.gate) := by
+        intro heq
+        apply hT_on_B
+        unfold Transistor.isOn at hT_on_A ⊢
+        simp only [heq] at hT_on_A
+        exact hT_on_A
+      obtain ⟨-, hB_eq⟩ := hREV0 T hT_mem hgate
+      rcases hT_ends with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact (congr_arg logic hB_eq).trans (ih hpow)
+      · exact (congr_arg logic hB_eq.symm).trans (ih hpow)
 
 -- REV1 implies DDC.
+-- Proof: contrapositive. If A(v) ≠ B(v), REV1 gives a B-powered node q with ABConnected A B v q.
+-- ABConnected implies A-connected, contradicting the hypothesis that v is A-disconnected from all B-powered nodes.
 theorem rev1_implies_ddc {net : Net} (A B : State net)
     (hREV1 : REV1 A B) : DDC A B := by
-  sorry
+  intro v hdisconn
+  by_contra hne
+  obtain ⟨-, q, hq_pow, hq_conn⟩ := hREV1 v hne
+  exact hdisconn q hq_pow hq_conn.1
 
 /-! ## Proof outline
 
