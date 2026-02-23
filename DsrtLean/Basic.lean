@@ -96,9 +96,9 @@ inductive Connected (net : Net) (active : Transistor net.nodes → Prop) :
 def ConnectedIn {net : Net} (S : State net) :=
   Connected net (fun T => T.isOn S.val)
 
--- AB-connected: connected through transistors on in either A or B
-def ABConnected {net : Net} (A B : State net) :=
-  Connected net (fun T => T.isOn A.val ∨ T.isOn B.val)
+-- AB-connected: connected in A AND connected in B (paths need not be the same)
+def ABConnected {net : Net} (A B : State net) (u v : net.nodes) : Prop :=
+  ConnectedIn A u v ∧ ConnectedIn B u v
 
 /-! ## Constraints -/
 
