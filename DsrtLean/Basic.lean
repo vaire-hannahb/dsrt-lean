@@ -241,13 +241,48 @@ theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
     obtain ⟨T, hT_mem, hT_on_B, hT_ends⟩ := h
     exact (step_logic_eq A B hCON_A hCAP hREV0 hDDC T hT_mem hT_on_B hT_ends).trans ih
 
--- Uniqueness: if (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same powered values, then B and C are identical on every node.
+-- Helper: logic is injective when both inputs are strong values.
+-- CLEAN gives us this on all nodes, lifting logical equality to exact equality.
+private lemma logic_injective_on_strong {v1 v2 : Value}
+    (h1 : v1 = .strong_low ∨ v1 = .strong_high)
+    (h2 : v2 = .strong_low ∨ v2 = .strong_high)
+    (heq : logic v1 = logic v2) : v1 = v2 := by
+  rcases h1 with rfl | rfl <;> rcases h2 with rfl | rfl <;> simp_all [logic]
+
+-- Helper: if B and C have the same powered function, they agree exactly at any powered node.
+private lemma powered_val_eq {net : Net} (B C : State net) (hpow : B.powered = C.powered)
+    (p : net.nodes) (hp : B.powered p ≠ none) : B.val p = C.val p := by
+  cases h : B.powered p with
+  | none => exact absurd h hp
+  | some w =>
+    have hC : C.powered p = some w := by rwa [← congr_fun hpow p]
+    exact (B.powered_consistent p w h).trans (C.powered_consistent p w hC).symm
+
+-- Uniqueness: if (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same
+-- powered values, then B and C are identical on every node.
 theorem uniqueness {net : Net} (A B C : State net)
     (hpow     : B.powered = C.powered)
     (hDDC_B   : DDC A B) (hCAP_B : CAP A B) (hCLEAN_B : CLEAN A B)
     (hDDC_C   : DDC A C) (hCAP_C : CAP A C) (hCLEAN_C : CLEAN A C) :
     ∀ v : net.nodes, B.val v = C.val v := by
-  sorry
+  intro v
+  by_cases h_pow : ∃ p : net.nodes, B.powered p ≠ none ∧ ConnectedIn A v p
+  · -- v is A-connected to a B/C-powered node p
+    obtain ⟨p, hp_pow, hp_conn⟩ := h_pow
+    have hCp : C.powered p ≠ none := by rwa [← congr_fun hpow p]
+    -- CAP: logic(B(v)) = logic(B(p)) = logic(C(p)) = logic(C(v))
+    have hlog : logic (B.val v) = logic (C.val v) :=
+      (hCAP_B v p hp_conn hp_pow).trans
+        ((congr_arg logic (powered_val_eq B C hpow p hp_pow)).trans
+          (hCAP_C v p hp_conn hCp).symm)
+    -- CLEAN makes logic injective, giving exact equality
+    exact logic_injective_on_strong (hCLEAN_B v) (hCLEAN_C v) hlog
+  · -- v is A-disconnected from all B/C-powered nodes; DDC gives B(v) = A(v) = C(v)
+    have h_disconn_B : ∀ p : net.nodes, B.powered p ≠ none → ¬ ConnectedIn A v p :=
+      fun p hp hc => h_pow ⟨p, hp, hc⟩
+    have h_disconn_C : ∀ p : net.nodes, C.powered p ≠ none → ¬ ConnectedIn A v p := by
+      intro p hp hc; exact h_disconn_B p (by rwa [hpow]) hc
+    exact (hDDC_B v h_disconn_B).symm.trans (hDDC_C v h_disconn_C)
 
 /-! ## Proof outline
 
