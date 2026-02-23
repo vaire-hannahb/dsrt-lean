@@ -185,12 +185,57 @@ theorem rev1_implies_ddc {net : Net} (A B : State net)
   exact hdisconn q hq_pow hq_conn.1
 
 -- CAP ∧ REV0 ∧ REV1 implies CON, given that A itself satisfies CON.
+-- The CON A A hypothesis is needed for the case where a transistor is on in both A and B
+-- but neither endpoint is A-connected to a B-powered node: DDC gives B(u) = A(u) and
+-- B(w) = A(w), and CON A A gives logic(A(u)) = logic(A(w)).
+
+-- Helper: a single transistor T on in B connecting u to w gives logic(B(u)) = logic(B(w)).
+private lemma step_logic_eq {net : Net} (A B : State net)
+    (hCON_A : CON A A) (hCAP : CAP A B) (hREV0 : REV0 A B) (hDDC : DDC A B)
+    (T : Transistor net.nodes) (hT_mem : T ∈ net.transistors) (hT_on_B : T.isOn B.val)
+    {u w : net.nodes} (hT_ends : T.endpoints u w) :
+    logic (B.val u) = logic (B.val w) := by
+  by_cases hT_on_A : T.isOn A.val
+  · -- T on in both A and B: u and w are A-connected via T
+    by_cases h_pow_u : ∃ p : net.nodes, B.powered p ≠ none ∧ ConnectedIn A u p
+    · -- u is A-connected to a B-powered node p; w is too via the reversed T step
+      obtain ⟨p, hp_pow, hp_conn_u⟩ := h_pow_u
+      have hT_ends_rev : T.endpoints w u := by unfold Transistor.endpoints at *; tauto
+      have hw_conn_p := Connected.step ⟨T, hT_mem, hT_on_A, hT_ends_rev⟩ hp_conn_u
+      exact (hCAP u p hp_conn_u hp_pow).trans (hCAP w p hw_conn_p hp_pow).symm
+    · -- Neither u nor w is A-connected to any B-powered node
+      -- (if w were, u would be too via T, contradicting h_pow_u)
+      have h_disconn_u : ∀ p : net.nodes, B.powered p ≠ none → ¬ ConnectedIn A u p :=
+        fun p hp hc => h_pow_u ⟨p, hp, hc⟩
+      have h_disconn_w : ∀ p : net.nodes, B.powered p ≠ none → ¬ ConnectedIn A w p :=
+        fun p hp hc => h_pow_u ⟨p, hp, Connected.step ⟨T, hT_mem, hT_on_A, hT_ends⟩ hc⟩
+      -- DDC gives B(u) = A(u) and B(w) = A(w); CON A A closes
+      rw [← hDDC u h_disconn_u, ← hDDC w h_disconn_w]
+      exact hCON_A u w (Connected.step ⟨T, hT_mem, hT_on_A, hT_ends⟩ (Connected.refl w))
+  · -- T off in A, on in B: gate changed, so REV0 gives B(source) = B(drain)
+    have hgate : logic (A.val T.gate) ≠ logic (B.val T.gate) := by
+      intro heq
+      apply hT_on_A
+      unfold Transistor.isOn at hT_on_B ⊢
+      simp only [← heq] at hT_on_B
+      exact hT_on_B
+    obtain ⟨-, hB_eq⟩ := hREV0 T hT_mem hgate
+    rcases hT_ends with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+    · exact congr_arg logic hB_eq
+    · exact (congr_arg logic hB_eq).symm
+
 theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
     (hCON_A : CON A A)
     (hCAP : CAP A B)
     (hREV0 : REV0 A B)
     (hREV1 : REV1 A B) : CON A B := by
-  sorry
+  have hDDC := rev1_implies_ddc A B hREV1
+  intro u v hconn
+  induction hconn with
+  | refl => rfl
+  | step h rest ih =>
+    obtain ⟨T, hT_mem, hT_on_B, hT_ends⟩ := h
+    exact (step_logic_eq A B hCON_A hCAP hREV0 hDDC T hT_mem hT_on_B hT_ends).trans ih
 
 /-! ## Proof outline
 
