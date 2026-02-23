@@ -184,9 +184,15 @@ theorem rev1_implies_ddc {net : Net} (A B : State net)
   obtain ⟨-, q, hq_pow, hq_conn⟩ := hREV1 v hne
   exact hdisconn q hq_pow hq_conn.1
 
-/-! ## Proof outline
+-- CAP ∧ REV0 ∧ REV1 implies CON, given that A itself satisfies CON.
+theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
+    (hCON_A : CON A A)
+    (hCAP : CAP A B)
+    (hREV0 : REV0 A B)
+    (hREV1 : REV1 A B) : CON A B := by
+  sorry
 
--- show CAP ∧ REV0 ∧ REV1 -> CON
+/-! ## Proof outline
 
 -- show uniqueness: if A, B and A, C both satisfy DDC and CAP, then B = C
 
