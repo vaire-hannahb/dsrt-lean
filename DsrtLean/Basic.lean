@@ -70,6 +70,7 @@ def pass : TransistorType → Value → Value
 /-! ## State -/
 
 -- Snapshot of the net at a single timestep
+@[ext]
 structure State (net : Net) where
   val : net.nodes → Value
   powered : net.nodes → Option Value
@@ -301,3 +302,22 @@ theorem uniqueness {net : Net} (A B C : State net)
 
 -- bonus: show algorithm is reversible
 -/
+
+/-! ## Simulation algorithm -/
+
+/-- The result of a single simulation timestep.
+  - `ok B`: successful transition to state `B`
+  - `shortCircuit u v`: nodes `u` and `v` are connected but hold opposite logical values
+  - `rev0Error T`: transistor `T` switches while its endpoints disagree (weak reversibility violated)
+  - `rev1Error v`: node `v` changes value without an AB-connected charge path (path-to-charge violated)
+-/
+inductive SimResult (net : Net) where
+  | ok           : State net → SimResult net
+  | shortCircuit : net.nodes → net.nodes → SimResult net
+  | rev0Error    : Transistor net.nodes → SimResult net
+  | rev1Error    : net.nodes → SimResult net
+
+/-- Run one simulation timestep: given the previous state `A` and the new powered assignment,
+    return either a valid next state or the first error encountered. -/
+def dsrt_sim_step {net : Net} (A : State net) (powered : net.nodes → Option Value) :
+    SimResult net := sorry
