@@ -259,9 +259,8 @@ private lemma powered_val_eq {net : Net} (B C : State net) (hpow : B.powered = C
     have hC : C.powered p = some w := by rwa [← congr_fun hpow p]
     exact (B.powered_consistent p w h).trans (C.powered_consistent p w hC).symm
 
--- Uniqueness: if (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same
--- powered values, then B and C are identical on every node.
-theorem uniqueness {net : Net} (A B C : State net)
+-- If (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same powered values, then B and C are identical on every node.
+private theorem val_uniqueness {net : Net} (A B C : State net)
     (hpow     : B.powered = C.powered)
     (hDDC_B   : DDC A B) (hCAP_B : CAP A B) (hCLEAN_B : CLEAN A B)
     (hDDC_C   : DDC A C) (hCAP_C : CAP A C) (hCLEAN_C : CLEAN A C) :
@@ -285,23 +284,6 @@ theorem uniqueness {net : Net} (A B C : State net)
       intro p hp hc; exact h_disconn_B p (by rwa [hpow]) hc
     exact (hDDC_B v h_disconn_B).symm.trans (hDDC_C v h_disconn_C)
 
-/-! ## Proof outline
-
--- define dsrt_sim(A, powered) as a function implementing the simulation algorithm
-
--- define dsrt_sim(A, powered) as a function implementing the simulation algorithm
-
--- show if algo doesn't output error, output matches REV0, REV1, DDC, CAP
-  -- deduce that therefore output matches CON, as REV0 ∧ REV1 ∧ CAP -> CON
-
--- show if algo outputs short-circuit, correct assignment is impossible
-
--- show if algo outputs REV0 or REV1 error, correct assignment is impossible
-  -- relies on uniqueness given we've already generated DDC and CAP compliant
-  -- assignment when we output REV0 or REV1 error
-
--- bonus: show algorithm is reversible
--/
 
 /-! ## Simulation algorithm -/
 
@@ -321,3 +303,50 @@ inductive SimResult (net : Net) where
     return either a valid next state or the first error encountered. -/
 def dsrt_sim_step {net : Net} (A : State net) (powered : net.nodes → Option Value) :
     SimResult net := sorry
+
+/-! ## Correctness of the simulation algorithm -/
+
+/-- A state `B` is a valid next state for `(A, powered)` if it uses the given powered assignment
+    and satisfies DDC, CAP, CLEAN, REV0, and REV1. CON follows from these and is not listed. -/
+def ValidNextState {net : Net} (A B : State net) (powered : net.nodes → Option Value) : Prop :=
+  B.powered = powered ∧
+  DDC A B ∧ CAP A B ∧ CLEAN A B ∧
+  REV0 A B ∧ REV1 A B
+
+/-- Soundness: if the algorithm returns `ok B`, then `B` is a valid next state. -/
+theorem soundness {net : Net} (A : State net) (powered : net.nodes → Option Value)
+    (B : State net) (h : dsrt_sim_step A powered = .ok B) :
+    ValidNextState A B powered := sorry
+
+private theorem shortCircuit_no_valid {net : Net} (A : State net)
+    (powered : net.nodes → Option Value) (u v : net.nodes)
+    (h : dsrt_sim_step A powered = .shortCircuit u v) :
+    ¬ ∃ B : State net, ValidNextState A B powered := sorry
+
+private theorem rev0Error_no_valid {net : Net} (A : State net)
+    (powered : net.nodes → Option Value) (T : Transistor net.nodes)
+    (h : dsrt_sim_step A powered = .rev0Error T) :
+    ¬ ∃ B : State net, ValidNextState A B powered := sorry
+
+private theorem rev1Error_no_valid {net : Net} (A : State net)
+    (powered : net.nodes → Option Value) (v : net.nodes)
+    (h : dsrt_sim_step A powered = .rev1Error v) :
+    ¬ ∃ B : State net, ValidNextState A B powered := sorry
+
+/-- Completeness: if a valid next state exists, the algorithm returns `ok B`. -/
+theorem completeness {net : Net} (A : State net) (powered : net.nodes → Option Value)
+    (h : ∃ B : State net, ValidNextState A B powered) :
+    ∃ B : State net, dsrt_sim_step A powered = .ok B := by
+  cases hresult : dsrt_sim_step A powered with
+  | ok B             => exact ⟨B, rfl⟩
+  | shortCircuit u v => exact absurd h (shortCircuit_no_valid A powered u v hresult)
+  | rev0Error T      => exact absurd h (rev0Error_no_valid A powered T hresult)
+  | rev1Error v      => exact absurd h (rev1Error_no_valid A powered v hresult)
+
+/-- Uniqueness: any two valid next states are pointwise identical. -/
+theorem uniqueness {net : Net} (A B C : State net) (powered : net.nodes → Option Value)
+    (hB : ValidNextState A B powered) (hC : ValidNextState A C powered) :
+    ∀ v, B.val v = C.val v := by
+  obtain ⟨hpowB, hDDC_B, hCAP_B, hCLEAN_B, -, -⟩ := hB
+  obtain ⟨hpowC, hDDC_C, hCAP_C, hCLEAN_C, -, -⟩ := hC
+  exact val_uniqueness A B C (hpowB.trans hpowC.symm) hDDC_B hCAP_B hCLEAN_B hDDC_C hCAP_C hCLEAN_C
