@@ -236,3 +236,281 @@ theorem reverse_uniqueness {net : Net} (A B C : State net)
   exact uniqueness_from_con_rev A B C hpow hCON_A hCON_B hCON_C hCLEAN_B hCLEAN_C
     (rev0_symm B A hREV0_B) (rev1_symm B A hREV1_B)
     (rev0_symm C A hREV0_C) (rev1_symm C A hREV1_C)
+
+/-! ## Counterexamples to the reverse implications -/
+
+private def ceDrainNode : Node := ⟨0⟩
+private def ceGateNode : Node := ⟨1⟩
+private def ceSourceNode : Node := ⟨2⟩
+
+private def ceNodes : Finset Node := {ceDrainNode, ceGateNode, ceSourceNode}
+
+private lemma ceDrain_mem : ceDrainNode ∈ ceNodes := by
+  simp [ceNodes]
+
+private lemma ceGate_mem : ceGateNode ∈ ceNodes := by
+  simp [ceNodes]
+
+private lemma ceSource_mem : ceSourceNode ∈ ceNodes := by
+  simp [ceNodes]
+
+private def ceDrain : ceNodes := ⟨ceDrainNode, ceDrain_mem⟩
+private def ceGate : ceNodes := ⟨ceGateNode, ceGate_mem⟩
+private def ceSource : ceNodes := ⟨ceSourceNode, ceSource_mem⟩
+
+private lemma ceNodes_cases (v : ceNodes) : v = ceDrain ∨ v = ceGate ∨ v = ceSource := by
+  rcases v with ⟨v, hv⟩
+  change v ∈ insert ceDrainNode (insert ceGateNode ({ceSourceNode} : Finset Node)) at hv
+  rw [Finset.mem_insert] at hv
+  rcases hv with rfl | hv
+  · exact Or.inl rfl
+  · rw [Finset.mem_insert] at hv
+    rcases hv with rfl | hv
+    · exact Or.inr <| Or.inl rfl
+    · rw [Finset.mem_singleton] at hv
+      exact Or.inr <| Or.inr (by cases hv; rfl)
+
+private def ceNet : Net where
+  nodes := ceNodes
+  transistors := {{
+    source := ceSource
+    gate := ceGate
+    drain := ceDrain
+    type := .nmos
+  }}
+
+private def ceTrans : Transistor ceNet.nodes := {
+  source := ceSource
+  gate := ceGate
+  drain := ceDrain
+  type := .nmos
+}
+
+private lemma ceDrain_ne_gate : ceDrain ≠ ceGate := by decide
+private lemma ceDrain_ne_source : ceDrain ≠ ceSource := by decide
+private lemma ceGate_ne_source : ceGate ≠ ceSource := by decide
+
+private lemma ceTrans_mem : ceTrans ∈ ceNet.transistors := by
+  change ceTrans ∈ ({{
+    source := ceSource
+    gate := ceGate
+    drain := ceDrain
+    type := .nmos
+  }} : Finset (Transistor ceNet.nodes))
+  exact Finset.mem_singleton.mpr rfl
+
+private lemma ceTrans_eq_of_mem {T : Transistor ceNet.nodes} (hT_mem : T ∈ ceNet.transistors) :
+    T = ceTrans := by
+  change T ∈ ({{
+    source := ceSource
+    gate := ceGate
+    drain := ceDrain
+    type := .nmos
+  }} : Finset (Transistor ceNet.nodes)) at hT_mem
+  exact Finset.mem_singleton.mp hT_mem
+
+private def ceVal (vd vg vs : Value) : ceNet.nodes → Value
+  | v =>
+      match v.1.id with
+      | 0 => vd
+      | 1 => vg
+      | _ => vs
+
+private def cePow (pd pg ps : Option Value) : ceNet.nodes → Option Value
+  | v =>
+      match v.1.id with
+      | 0 => pd
+      | 1 => pg
+      | _ => ps
+
+@[simp] private lemma ceVal_drain (vd vg vs : Value) :
+    ceVal vd vg vs ceDrain = vd := by
+  simp [ceVal, ceDrain, ceDrainNode]
+
+@[simp] private lemma ceVal_gate (vd vg vs : Value) :
+    ceVal vd vg vs ceGate = vg := by
+  rfl
+
+@[simp] private lemma ceVal_source (vd vg vs : Value) :
+    ceVal vd vg vs ceSource = vs := by
+  rfl
+
+@[simp] private lemma cePow_drain (pd pg ps : Option Value) :
+    cePow pd pg ps ceDrain = pd := by
+  simp [cePow, ceDrain, ceDrainNode]
+
+@[simp] private lemma cePow_gate (pd pg ps : Option Value) :
+    cePow pd pg ps ceGate = pg := by
+  rfl
+
+@[simp] private lemma cePow_source (pd pg ps : Option Value) :
+    cePow pd pg ps ceSource = ps := by
+  rfl
+
+private def rev0A : State ceNet where
+  val := ceVal .strong_low .strong_low .strong_high
+  powered := cePow (.some .strong_low) (.some .strong_low) (.some .strong_high)
+  powered_consistent := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+  powered_strong := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+    · exact Or.inr <| by simpa using (Option.some.inj h).symm
+
+private def rev0B : State ceNet where
+  val := ceVal .strong_low .strong_high .strong_low
+  powered := cePow (.some .strong_low) (.some .strong_high) (.some .strong_low)
+  powered_consistent := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+  powered_strong := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+    · exact Or.inr <| by simpa using (Option.some.inj h).symm
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+
+private def rev1A : State ceNet where
+  val := ceVal .strong_low .strong_high .strong_low
+  powered := cePow (.some .strong_low) (.some .strong_high) (.some .strong_low)
+  powered_consistent := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+  powered_strong := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+    · exact Or.inr <| by simpa using (Option.some.inj h).symm
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+
+private def rev1B : State ceNet where
+  val := ceVal .strong_high .strong_low .strong_high
+  powered := cePow none (.some .strong_low) (.some .strong_high)
+  powered_consistent := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · simp at h
+    · simpa using Option.some.inj h
+    · simpa using Option.some.inj h
+  powered_strong := by
+    intro v w h
+    rcases ceNodes_cases v with rfl | rfl | rfl
+    · simp at h
+    · exact Or.inl <| by simpa using (Option.some.inj h).symm
+    · exact Or.inr <| by simpa using (Option.some.inj h).symm
+
+private lemma ceTrans_off_rev0A : ¬ ceTrans.isOn rev0A.val := by
+  native_decide
+
+private lemma ceTrans_on_rev0B : ceTrans.isOn rev0B.val := by
+  native_decide
+
+private lemma ceTrans_on_rev1A : ceTrans.isOn rev1A.val := by
+  native_decide
+
+private lemma ceTrans_off_rev1B : ¬ ceTrans.isOn rev1B.val := by
+  native_decide
+
+private lemma connected_eq_of_ceTrans_off {S : State ceNet} (hoff : ¬ ceTrans.isOn S.val)
+    {u v : ceNet.nodes} (hconn : ConnectedIn S u v) : u = v := by
+  induction hconn with
+  | refl _ => rfl
+  | step h _ _ =>
+      obtain ⟨T, hT_mem, hT_on, _⟩ := h
+      have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
+      subst hT
+      exact False.elim (hoff hT_on)
+
+private lemma con_rev0B : CON rev0B rev0B := by
+  intro u v hconn
+  induction hconn with
+  | refl _ => rfl
+  | @step a b c h rest ih =>
+      obtain ⟨T, hT_mem, hT_on, hT_ends⟩ := h
+      have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
+      subst hT
+      have hab : logic (rev0B.val a) = logic (rev0B.val b) := by
+        rcases hT_ends with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> subst h1 <;> subst h2 <;> native_decide
+      exact hab.trans ih
+
+private lemma ddc_rev0 : DDC rev0A rev0B := by
+  intro v hdisconn
+  exact False.elim <| hdisconn v (by rcases ceNodes_cases v with rfl | rfl | rfl <;> simp [rev0B]) (Connected.refl _)
+
+private lemma cap_rev0 : CAP rev0A rev0B := by
+  intro v p hconn hpow
+  cases hconn with
+  | refl _ => rfl
+  | step h _ =>
+      obtain ⟨T, hT_mem, hT_on, _⟩ := h
+      have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
+      subst hT
+      exact False.elim (ceTrans_off_rev0A hT_on)
+
+private lemma not_rev0_rev0 : ¬ REV0 rev0A rev0B := by
+  intro hREV0
+  have hgate : logic (rev0A.val ceTrans.gate) ≠ logic (rev0B.val ceTrans.gate) := by
+    simp [rev0A, rev0B, ceTrans, logic]
+  obtain ⟨hAeq, _⟩ := hREV0 ceTrans ceTrans_mem hgate
+  simp [rev0A, ceTrans] at hAeq
+
+private lemma con_rev1B : CON rev1B rev1B := by
+  intro u v hconn
+  have hEq : u = v := connected_eq_of_ceTrans_off ceTrans_off_rev1B hconn
+  subst hEq
+  rfl
+
+private lemma rev0_rev1 : REV0 rev1A rev1B := by
+  intro T hT_mem hgate
+  have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
+  subst hT
+  refine ⟨?_, ?_⟩ <;> simp [rev1A, rev1B, ceTrans]
+
+private lemma cap_rev1 : CAP rev1A rev1B :=
+  con_rev0_implies_cap rev1A rev1B con_rev1B rev0_rev1
+
+private lemma ddc_rev1 : DDC rev1A rev1B := by
+  intro v hdisconn
+  rcases ceNodes_cases v with rfl | rfl | rfl
+  · exact False.elim <| hdisconn ceSource (by simp [rev1B]) <|
+      Connected.step ⟨ceTrans, ceTrans_mem, ceTrans_on_rev1A, Or.inr ⟨rfl, rfl⟩⟩ (Connected.refl _)
+  · exact False.elim <| hdisconn ceGate (by simp [rev1B]) (Connected.refl _)
+  · exact False.elim <| hdisconn ceSource (by simp [rev1B]) (Connected.refl _)
+
+private lemma not_rev1_rev1 : ¬ REV1 rev1A rev1B := by
+  intro hREV1
+  have hchg : rev1A.val ceDrain ≠ rev1B.val ceDrain := by
+    simp [rev1A, rev1B]
+  obtain ⟨_, ⟨q, hqpow, hAB⟩⟩ := hREV1 ceDrain hchg
+  rcases ceNodes_cases q with rfl | rfl | rfl
+  · exact hqpow rfl
+  · have : ConnectedIn rev1B ceDrain ceGate := hAB.2
+    have hEq : ceDrain = ceGate := connected_eq_of_ceTrans_off ceTrans_off_rev1B this
+    exact ceDrain_ne_gate hEq
+  · have : ConnectedIn rev1B ceDrain ceSource := hAB.2
+    have hEq : ceDrain = ceSource := connected_eq_of_ceTrans_off ceTrans_off_rev1B this
+    exact ceDrain_ne_source hEq
+
+/-- There exist compliant states satisfying `CON`, `DDC`, and `CAP` but violating `REV0`. -/
+theorem exists_con_ddc_cap_not_rev0 :
+    ∃ (net : Net) (A B : State net),
+      CON B B ∧ DDC A B ∧ CAP A B ∧ ¬ REV0 A B := by
+  refine ⟨ceNet, rev0A, rev0B, con_rev0B, ddc_rev0, cap_rev0, not_rev0_rev0⟩
+
+/-- There exist compliant states satisfying `CON`, `DDC`, and `CAP` but violating `REV1`. -/
+theorem exists_con_ddc_cap_not_rev1 :
+    ∃ (net : Net) (A B : State net),
+      CON B B ∧ DDC A B ∧ CAP A B ∧ ¬ REV1 A B := by
+  refine ⟨ceNet, rev1A, rev1B, con_rev1B, ddc_rev1, cap_rev1, not_rev1_rev1⟩
