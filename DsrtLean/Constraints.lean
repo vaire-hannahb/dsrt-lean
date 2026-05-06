@@ -161,6 +161,19 @@ theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
 
 /-! ## Uniqueness -/
 
+theorem rev0_symm {net : Net} (A B : State net) (hREV0 : REV0 A B) : REV0 B A := by
+  intro T hT_mem hgate
+  obtain ⟨hA, hB⟩ := hREV0 T hT_mem (Ne.symm hgate)
+  exact ⟨hB, hA⟩
+
+theorem rev1_symm {net : Net} (A B : State net) (hREV1 : REV1 A B) : REV1 B A := by
+  intro v hchange
+  have hchange' : A.val v ≠ B.val v := Ne.symm hchange
+  obtain ⟨⟨p, hp, hABp⟩, ⟨q, hq, hABq⟩⟩ := hREV1 v hchange'
+  refine ⟨?_, ?_⟩
+  · exact ⟨q, hq, by simpa [ABConnected, and_left_comm, and_assoc, and_comm] using hABq⟩
+  · exact ⟨p, hp, by simpa [ABConnected, and_left_comm, and_assoc, and_comm] using hABp⟩
+
 /-- If (A, B) and (A, C) both satisfy DDC, CAP, and CLEAN, and assign the same powered values,
     then B and C are identical on every node. -/
 theorem val_uniqueness {net : Net} (A B C : State net)
@@ -190,3 +203,36 @@ theorem val_uniqueness {net : Net} (A B C : State net)
     have h_disconn_C : ∀ p : net.nodes, C.powered p ≠ none → ¬ ConnectedIn A v p := by
       intro p hp hc; exact h_disconn_B p (by rwa [hpow]) hc
     exact (hDDC_B v h_disconn_B).symm.trans (hDDC_C v h_disconn_C)
+
+/-- Forward uniqueness:
+    if `B` and `C` share a powered assignment and each satisfy `CON`, `REV0`, `REV1`, and
+    `CLEAN` relative to the same prior state `A`, then `B = C`. -/
+theorem uniqueness_from_con_rev {net : Net} (A B C : State net)
+    (hpow    : B.powered = C.powered)
+    (_hCON_A : CON A A) (hCON_B : CON B B) (hCON_C : CON C C)
+    (hCLEAN_B : CLEAN A B) (hCLEAN_C : CLEAN A C)
+    (hREV0_B : REV0 A B) (hREV1_B : REV1 A B)
+    (hREV0_C : REV0 A C) (hREV1_C : REV1 A C) :
+    B = C := by
+  have hDDC_B : DDC A B := rev1_implies_ddc A B hREV1_B
+  have hDDC_C : DDC A C := rev1_implies_ddc A C hREV1_C
+  have hCAP_B : CAP A B := con_rev0_implies_cap A B hCON_B hREV0_B
+  have hCAP_C : CAP A C := con_rev0_implies_cap A C hCON_C hREV0_C
+  apply State.ext
+  · funext v
+    exact val_uniqueness A B C hpow hDDC_B hCAP_B hCLEAN_B hDDC_C hCAP_C hCLEAN_C v
+  · exact hpow
+
+/-- Reverse uniqueness (Lemma 4 in the paper):
+    if `B` and `C` share a powered assignment and each satisfy `CON`, `REV0`, `REV1`, and
+    `CLEAN` relative to the same successor state `A`, then `B = C`. -/
+theorem reverse_uniqueness {net : Net} (A B C : State net)
+    (hpow    : B.powered = C.powered)
+    (hCON_A : CON A A) (hCON_B : CON B B) (hCON_C : CON C C)
+    (hCLEAN_B : CLEAN A B) (hCLEAN_C : CLEAN A C)
+    (hREV0_B : REV0 B A) (hREV1_B : REV1 B A)
+    (hREV0_C : REV0 C A) (hREV1_C : REV1 C A) :
+    B = C := by
+  exact uniqueness_from_con_rev A B C hpow hCON_A hCON_B hCON_C hCLEAN_B hCLEAN_C
+    (rev0_symm B A hREV0_B) (rev1_symm B A hREV1_B)
+    (rev0_symm C A hREV0_C) (rev1_symm C A hREV1_C)
