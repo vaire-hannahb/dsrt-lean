@@ -30,7 +30,7 @@ theorem simStepRelation_shortCircuit_no_valid {net : Net} (A : State net)
     exact shortCircuit_no_validNextState A powered ⟨v, hSC⟩
 
 -- A rev0Error means no valid next state exists.
--- The unique ValidFloodFill state already fails REV0, so no candidate can satisfy ValidNextState.
+-- The unique ValidFloodFill state already fails ADB, so no candidate can satisfy ValidNextState.
 theorem simStepRelation_rev0Error_no_valid {net : Net} (A : State net)
     (powered : net.nodes → Option Value) (requireStatic : Bool) (T : Transistor net.nodes)
     (h : SimStepRelation requireStatic A powered (.rev0Error T)) :
@@ -40,16 +40,16 @@ theorem simStepRelation_rev0Error_no_valid {net : Net} (A : State net)
     intro ⟨B', hB'⟩
     have hVF' := validNextState_implies_validFloodFill A B' powered hB'
     have huniq := validFloodFill_uniqueness A _ B' powered hVF hVF'
-    obtain ⟨-, -, -, -, hREV0, -⟩ := hB'
+    obtain ⟨-, -, -, -, hADB, -⟩ := hB'
     have hgate' : logic (A.val T.gate) ≠ logic (B'.val T.gate) :=
       fun heq => hgate (heq.trans (congr_arg logic (huniq T.gate)).symm)
-    obtain ⟨h1, h2⟩ := hREV0 T hT_mem hgate'
+    obtain ⟨h1, h2⟩ := hADB T hT_mem hgate'
     rcases hends with hA | hBe
     · exact hA h1
     · exact hBe ((huniq T.source).trans (h2.trans (huniq T.drain).symm))
 
 -- A rev1Error means no valid next state exists.
--- The unique ValidFloodFill state already fails REV1, so no candidate can satisfy ValidNextState.
+-- The unique ValidFloodFill state already fails PTC, so no candidate can satisfy ValidNextState.
 theorem simStepRelation_rev1Error_no_valid {net : Net} (A : State net)
     (powered : net.nodes → Option Value) (requireStatic : Bool) (v : net.nodes)
     (h : SimStepRelation requireStatic A powered (.rev1Error v)) :
@@ -59,10 +59,10 @@ theorem simStepRelation_rev1Error_no_valid {net : Net} (A : State net)
     intro ⟨B', hB'⟩
     have hVF' := validNextState_implies_validFloodFill A B' powered hB'
     have huniq := validFloodFill_uniqueness A _ B' powered hVF hVF'
-    obtain ⟨-, -, -, -, -, hREV1⟩ := hB'
+    obtain ⟨-, -, -, -, -, hPTC⟩ := hB'
     have hchange' : A.val v ≠ B'.val v :=
       fun heq => hchange (heq.trans (huniq v).symm)
-    obtain ⟨hA_conn, hB_conn⟩ := hREV1 v hchange'
+    obtain ⟨hA_conn, hB_conn⟩ := hPTC v hchange'
     rcases hdisconn with hA_disconn | hB_disconn
     · obtain ⟨p, hAp, hABconn'⟩ := hA_conn
       exact hA_disconn p hAp ⟨hABconn'.1, (connectedIn_congr _ _ huniq).mpr hABconn'.2⟩

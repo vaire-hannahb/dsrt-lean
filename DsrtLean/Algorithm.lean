@@ -102,7 +102,7 @@ def ValidFloodFillPreClean {net : Net} (A B : State net) (powered : net.nodes �
 
 /-- ValidFloodFill: B satisfies the powered assignment, DDC, CAP, and CLEAN.
     This is the postcondition of phases 1–3 of the algorithm (flood fill, DDC fill, CLEAN),
-    and the precondition for the REV0 and REV1 checks in phases 4 and 5.
+    and the precondition for the ADB and PTC checks in phases 4 and 5.
     Strictly weaker than ValidNextState: reversibility is not yet checked. -/
 def ValidFloodFill {net : Net} (A B : State net) (powered : net.nodes → Option Value) : Prop :=
   B.powered = powered ∧
@@ -115,10 +115,10 @@ theorem validNextState_implies_validFloodFill {net : Net} (A B : State net)
     ValidFloodFill A B powered :=
   ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1⟩
 
--- Supplying REV0 and REV1 on top of ValidFloodFill recovers ValidNextState.
+-- Supplying ADB and PTC on top of ValidFloodFill recovers ValidNextState.
 theorem validFloodFill_rev0_rev1 {net : Net} (A B : State net)
     (powered : net.nodes → Option Value)
-    (hVF : ValidFloodFill A B powered) (hR0 : REV0 A B) (hR1 : REV1 A B) :
+    (hVF : ValidFloodFill A B powered) (hR0 : ADB A B) (hR1 : PTC A B) :
     ValidNextState A B powered :=
   ⟨hVF.1, hVF.2.1, hVF.2.2.1, hVF.2.2.2, hR0, hR1⟩
 
@@ -145,8 +145,8 @@ inductive SimResult (net : Net) where
     pseudocode.
 
     - `shortCircuit`: flood fill detects conflicting drives (phase 1 fails)
-    - `rev0Error`:    flood fill succeeded; REV0 check fails (phase 4 fails)
-    - `rev1Error`:    REV0 passed; REV1 check fails (phase 5 fails)
+    - `rev0Error`:    flood fill succeeded; ADB check fails (phase 4 fails)
+    - `rev1Error`:    ADB passed; PTC check fails (phase 5 fails)
     - `ok`:           all phases passed
 
     Correctness theorems (soundness, per-error impossibility, completeness, uniqueness)
@@ -168,8 +168,8 @@ inductive SimStepRelation {net : Net} (requireStatic : Bool)
       ValidFloodFill A B powered →
       (∀ p, B.powered p ≠ none → ¬ ConnectedIn B v p) →
       SimStepRelation requireStatic A powered (.staticError v)
-  /-- Phases 1–3 succeeded; phase 4 (REV0 check) failed.
-      T witnesses the violation: the conditions are exactly ¬ (T's contribution to REV0 A B). -/
+  /-- Phases 1–3 succeeded; phase 4 (ADB check) failed.
+      T witnesses the violation: the conditions are exactly ¬ (T's contribution to ADB A B). -/
   | rev0Error {B : State net} {T : Transistor net.nodes} :
       ¬ ShortCircuit A powered →
       ValidFloodFill A B powered →
@@ -177,13 +177,13 @@ inductive SimStepRelation {net : Net} (requireStatic : Bool)
       logic (A.val T.gate) ≠ logic (B.val T.gate) →
       (A.val T.source ≠ A.val T.drain ∨ B.val T.source ≠ B.val T.drain) →
       SimStepRelation requireStatic A powered (.rev0Error T)
-  /-- Phases 1–4 succeeded; phase 5 (REV1 check) failed.
+  /-- Phases 1–4 succeeded; phase 5 (PTC check) failed.
       v witnesses the violation: A.val v ≠ B.val v and v lacks an AB-connected charge path.
-      The two disjuncts correspond to the two halves of the REV1 conjunction. -/
+      The two disjuncts correspond to the two halves of the PTC conjunction. -/
   | rev1Error {B : State net} {v : net.nodes} :
       ¬ ShortCircuit A powered →
       ValidFloodFill A B powered →
-      REV0 A B →
+      ADB A B →
       A.val v ≠ B.val v →
       ((∀ p, A.powered p ≠ none → ¬ ABConnected A B v p) ∨
        (∀ q, B.powered q ≠ none → ¬ ABConnected A B v q)) →
@@ -192,8 +192,8 @@ inductive SimStepRelation {net : Net} (requireStatic : Bool)
   | ok {B : State net} :
       ¬ ShortCircuit A powered →
       ValidFloodFill A B powered →
-      REV0 A B →
-      REV1 A B →
+      ADB A B →
+      PTC A B →
       (requireStatic = false ∨ STAT A B) →
       SimStepRelation requireStatic A powered (.ok B)
 

@@ -17,7 +17,7 @@ lake build
 - `DsrtLean/Basic.lean`
   - Core semantic objects: values, logic projection, transistor on/off, pass behavior, state, connectivity.
 - `DsrtLean/Constraints.lean`
-  - Constraint predicates (`CON`, `REV0`, `REV1`, `STAT`, `CLEAN`, `CAP`, `DDC`) and key implication/uniqueness theorems.
+  - Constraint predicates (`CON`, `ADB`, `PTC`, `STAT`, `CLEAN`, `CAP`, `DDC`) and key implication/uniqueness theorems.
 - `DsrtLean/Algorithm.lean`
   - Relational algorithm model (`Drives`, `ShortCircuit`, `ValidFloodFill`, `SimResult`, `SimStepRelation`).
 - `DsrtLean/Correctness.lean`
@@ -39,7 +39,7 @@ lake build
 ### REV2 (strict reversibility)
 
 `REV2` is treated as optional in the paper discussion and is **not included** in the current Lean proof target.  
-Rationale: `REV2` trivially implies `REV0`, and the relations proved in this artifact require `REV0` (not `REV2`) together with the other core constraints. So adding `REV2` would be a strict strengthening, not needed for the results formalized here.
+Rationale: `REV2` trivially implies `ADB`, and the relations proved in this artifact require `ADB` (not `REV2`) together with the other core constraints. So adding `REV2` would be a strict strengthening, not needed for the results formalized here.
 
 ### CLEAN
 
@@ -71,8 +71,8 @@ For theorem statements, we therefore make `CLEAN` mandatory in `ValidNextState`,
 
 ### Other results
 
-- `CON ∧ REV0 -> CAP`: `con_rev0_implies_cap`.
-- `REV1 -> DDC`: `rev1_implies_ddc`.
-- `(CAP ∧ REV0 ∧ REV1, plus CON on A) -> CON on B`: `cap_rev0_rev1_implies_con`.
+- `CON ∧ ADB -> CAP`: `con_rev0_implies_cap`.
+- `PTC -> DDC`: `rev1_implies_ddc`.
+- `(CAP ∧ ADB ∧ PTC, plus CON on A) -> CON on B`: `cap_rev0_rev1_implies_con`.
 - Short-circuit implies CAP impossibility and no valid next state:
   - `shortCircuit_no_cap`, `shortCircuit_no_validNextState` (`DsrtLean/Algorithm.lean`).
