@@ -60,8 +60,8 @@ For theorem statements, we therefore make `CLEAN` mandatory in `ValidNextState`,
   - Lean: `simStepRelation_complete`.
 - **Error impossibility results**: each error constructor corresponds to impossibility of a compliant next state (or statically compliant next state for `staticError`).
   - Lean: `simStepRelation_shortCircuit_no_valid`,
-    `simStepRelation_rev0Error_no_valid`,
-    `simStepRelation_rev1Error_no_valid`,
+    `simStepRelation_adbError_no_valid`,
+    `simStepRelation_ptcError_no_valid`,
     `simStepRelation_staticError_no_valid_stat`.
 
 ### Uniqueness
@@ -71,8 +71,8 @@ For theorem statements, we therefore make `CLEAN` mandatory in `ValidNextState`,
 
 ### Other results
 
-- `CON ∧ ADB -> CAP`: `con_rev0_implies_cap`.
-- `PTC -> DDC`: `rev1_implies_ddc`.
-- `(CAP ∧ ADB ∧ PTC, plus CON on A) -> CON on B`: `cap_rev0_rev1_implies_con`.
+- `CON ∧ ADB -> CAP`: `con_adb_implies_cap`.
+- `PTC -> DDC`: `ptc_implies_ddc`.
+- `(CAP ∧ ADB ∧ PTC, plus CON on A) -> CON on B`: `cap_adb_ptc_implies_con`.
 - Short-circuit implies CAP impossibility and no valid next state:
   - `shortCircuit_no_cap`, `shortCircuit_no_validNextState` (`DsrtLean/Algorithm.lean`).

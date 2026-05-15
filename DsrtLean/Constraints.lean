@@ -77,7 +77,7 @@ def ValidNextStateStat {net : Net} (A B : State net) (powered : net.nodes → Op
 --     If T is on in B: v and b are B-connected, so CON gives logic(B(v)) = logic(B(b)).
 --     If T is off in B: gate changed A→B, so ADB gives B(T.source) = B(T.drain).
 --   Chain with the IH (logic(B(b)) = logic(B(p))) in both cases.
-theorem con_rev0_implies_cap {net : Net} (A B : State net)
+theorem con_adb_implies_cap {net : Net} (A B : State net)
     (hCON : CON A B) (hADB : ADB A B) : CAP A B := by
   intro v p hconn
   induction hconn with
@@ -105,7 +105,7 @@ theorem con_rev0_implies_cap {net : Net} (A B : State net)
 -- PTC implies DDC.
 -- Proof: contrapositive. If A(v) ≠ B(v), PTC gives a B-powered node q with ABConnected A B v q.
 -- ABConnected implies A-connected, contradicting the hypothesis.
-theorem rev1_implies_ddc {net : Net} (A B : State net)
+theorem ptc_implies_ddc {net : Net} (A B : State net)
     (hPTC : PTC A B) : DDC A B := by
   intro v hdisconn
   by_contra hne
@@ -146,12 +146,12 @@ private lemma step_logic_eq {net : Net} (A B : State net)
     · exact (congr_arg logic hB_eq).symm
 
 -- CAP ∧ ADB ∧ PTC implies CON, given that A itself satisfies CON.
-theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
+theorem cap_adb_ptc_implies_con {net : Net} (A B : State net)
     (hCON_A : CON A A)
     (hCAP : CAP A B)
     (hADB : ADB A B)
     (hPTC : PTC A B) : CON A B := by
-  have hDDC := rev1_implies_ddc A B hPTC
+  have hDDC := ptc_implies_ddc A B hPTC
   intro u v hconn
   induction hconn with
   | refl => rfl
@@ -161,12 +161,12 @@ theorem cap_rev0_rev1_implies_con {net : Net} (A B : State net)
 
 /-! ## Uniqueness -/
 
-theorem rev0_symm {net : Net} (A B : State net) (hADB : ADB A B) : ADB B A := by
+theorem adb_symm {net : Net} (A B : State net) (hADB : ADB A B) : ADB B A := by
   intro T hT_mem hgate
   obtain ⟨hA, hB⟩ := hADB T hT_mem (Ne.symm hgate)
   exact ⟨hB, hA⟩
 
-theorem rev1_symm {net : Net} (A B : State net) (hPTC : PTC A B) : PTC B A := by
+theorem ptc_symm {net : Net} (A B : State net) (hPTC : PTC A B) : PTC B A := by
   intro v hchange
   have hchange' : A.val v ≠ B.val v := Ne.symm hchange
   obtain ⟨⟨p, hp, hABp⟩, ⟨q, hq, hABq⟩⟩ := hPTC v hchange'
@@ -214,10 +214,10 @@ theorem uniqueness_from_con_rev {net : Net} (A B C : State net)
     (hADB_B : ADB A B) (hPTC_B : PTC A B)
     (hADB_C : ADB A C) (hPTC_C : PTC A C) :
     B = C := by
-  have hDDC_B : DDC A B := rev1_implies_ddc A B hPTC_B
-  have hDDC_C : DDC A C := rev1_implies_ddc A C hPTC_C
-  have hCAP_B : CAP A B := con_rev0_implies_cap A B hCON_B hADB_B
-  have hCAP_C : CAP A C := con_rev0_implies_cap A C hCON_C hADB_C
+  have hDDC_B : DDC A B := ptc_implies_ddc A B hPTC_B
+  have hDDC_C : DDC A C := ptc_implies_ddc A C hPTC_C
+  have hCAP_B : CAP A B := con_adb_implies_cap A B hCON_B hADB_B
+  have hCAP_C : CAP A C := con_adb_implies_cap A C hCON_C hADB_C
   apply State.ext
   · funext v
     exact val_uniqueness A B C hpow hDDC_B hCAP_B hCLEAN_B hDDC_C hCAP_C hCLEAN_C v
@@ -234,8 +234,8 @@ theorem reverse_uniqueness {net : Net} (A B C : State net)
     (hADB_C : ADB C A) (hPTC_C : PTC C A) :
     B = C := by
   exact uniqueness_from_con_rev A B C hpow hCON_A hCON_B hCON_C hCLEAN_B hCLEAN_C
-    (rev0_symm B A hADB_B) (rev1_symm B A hPTC_B)
-    (rev0_symm C A hADB_C) (rev1_symm C A hPTC_C)
+    (adb_symm B A hADB_B) (ptc_symm B A hPTC_B)
+    (adb_symm C A hADB_C) (ptc_symm C A hPTC_C)
 
 /-! ## Counterexamples to the reverse implications -/
 
@@ -347,7 +347,7 @@ private def cePow (pd pg ps : Option Value) : ceNet.nodes → Option Value
     cePow pd pg ps ceSource = ps := by
   rfl
 
-private def rev0A : State ceNet where
+private def adbA : State ceNet where
   val := ceVal .strong_low .strong_low .strong_high
   powered := cePow (.some .strong_low) (.some .strong_low) (.some .strong_high)
   powered_consistent := by
@@ -363,7 +363,7 @@ private def rev0A : State ceNet where
     · exact Or.inl <| by simpa using (Option.some.inj h).symm
     · exact Or.inr <| by simpa using (Option.some.inj h).symm
 
-private def rev0B : State ceNet where
+private def adbB : State ceNet where
   val := ceVal .strong_low .strong_high .strong_low
   powered := cePow (.some .strong_low) (.some .strong_high) (.some .strong_low)
   powered_consistent := by
@@ -379,7 +379,7 @@ private def rev0B : State ceNet where
     · exact Or.inr <| by simpa using (Option.some.inj h).symm
     · exact Or.inl <| by simpa using (Option.some.inj h).symm
 
-private def rev1A : State ceNet where
+private def ptcA : State ceNet where
   val := ceVal .strong_low .strong_high .strong_low
   powered := cePow (.some .strong_low) (.some .strong_high) (.some .strong_low)
   powered_consistent := by
@@ -395,7 +395,7 @@ private def rev1A : State ceNet where
     · exact Or.inr <| by simpa using (Option.some.inj h).symm
     · exact Or.inl <| by simpa using (Option.some.inj h).symm
 
-private def rev1B : State ceNet where
+private def ptcB : State ceNet where
   val := ceVal .strong_high .strong_low .strong_high
   powered := cePow none (.some .strong_low) (.some .strong_high)
   powered_consistent := by
@@ -411,16 +411,16 @@ private def rev1B : State ceNet where
     · exact Or.inl <| by simpa using (Option.some.inj h).symm
     · exact Or.inr <| by simpa using (Option.some.inj h).symm
 
-private lemma ceTrans_off_rev0A : ¬ ceTrans.isOn rev0A.val := by
+private lemma ceTrans_off_adbA : ¬ ceTrans.isOn adbA.val := by
   native_decide
 
-private lemma ceTrans_on_rev0B : ceTrans.isOn rev0B.val := by
+private lemma ceTrans_on_adbB : ceTrans.isOn adbB.val := by
   native_decide
 
-private lemma ceTrans_on_rev1A : ceTrans.isOn rev1A.val := by
+private lemma ceTrans_on_ptcA : ceTrans.isOn ptcA.val := by
   native_decide
 
-private lemma ceTrans_off_rev1B : ¬ ceTrans.isOn rev1B.val := by
+private lemma ceTrans_off_ptcB : ¬ ceTrans.isOn ptcB.val := by
   native_decide
 
 private lemma connected_eq_of_ceTrans_off {S : State ceNet} (hoff : ¬ ceTrans.isOn S.val)
@@ -433,7 +433,7 @@ private lemma connected_eq_of_ceTrans_off {S : State ceNet} (hoff : ¬ ceTrans.i
       subst hT
       exact False.elim (hoff hT_on)
 
-private lemma con_rev0B : CON rev0B rev0B := by
+private lemma con_adbB : CON adbB adbB := by
   intro u v hconn
   induction hconn with
   | refl _ => rfl
@@ -441,15 +441,15 @@ private lemma con_rev0B : CON rev0B rev0B := by
       obtain ⟨T, hT_mem, hT_on, hT_ends⟩ := h
       have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
       subst hT
-      have hab : logic (rev0B.val a) = logic (rev0B.val b) := by
+      have hab : logic (adbB.val a) = logic (adbB.val b) := by
         rcases hT_ends with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> subst h1 <;> subst h2 <;> native_decide
       exact hab.trans ih
 
-private lemma ddc_rev0 : DDC rev0A rev0B := by
+private lemma ddc_adb : DDC adbA adbB := by
   intro v hdisconn
-  exact False.elim <| hdisconn v (by rcases ceNodes_cases v with rfl | rfl | rfl <;> simp [rev0B]) (Connected.refl _)
+  exact False.elim <| hdisconn v (by rcases ceNodes_cases v with rfl | rfl | rfl <;> simp [adbB]) (Connected.refl _)
 
-private lemma cap_rev0 : CAP rev0A rev0B := by
+private lemma cap_adb : CAP adbA adbB := by
   intro v p hconn hpow
   cases hconn with
   | refl _ => rfl
@@ -457,60 +457,60 @@ private lemma cap_rev0 : CAP rev0A rev0B := by
       obtain ⟨T, hT_mem, hT_on, _⟩ := h
       have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
       subst hT
-      exact False.elim (ceTrans_off_rev0A hT_on)
+      exact False.elim (ceTrans_off_adbA hT_on)
 
-private lemma not_rev0_rev0 : ¬ ADB rev0A rev0B := by
+private lemma not_adb_adb : ¬ ADB adbA adbB := by
   intro hADB
-  have hgate : logic (rev0A.val ceTrans.gate) ≠ logic (rev0B.val ceTrans.gate) := by
-    simp [rev0A, rev0B, ceTrans, logic]
+  have hgate : logic (adbA.val ceTrans.gate) ≠ logic (adbB.val ceTrans.gate) := by
+    simp [adbA, adbB, ceTrans, logic]
   obtain ⟨hAeq, _⟩ := hADB ceTrans ceTrans_mem hgate
-  simp [rev0A, ceTrans] at hAeq
+  simp [adbA, ceTrans] at hAeq
 
-private lemma con_rev1B : CON rev1B rev1B := by
+private lemma con_ptcB : CON ptcB ptcB := by
   intro u v hconn
-  have hEq : u = v := connected_eq_of_ceTrans_off ceTrans_off_rev1B hconn
+  have hEq : u = v := connected_eq_of_ceTrans_off ceTrans_off_ptcB hconn
   subst hEq
   rfl
 
-private lemma rev0_rev1 : ADB rev1A rev1B := by
+private lemma adb_ptc : ADB ptcA ptcB := by
   intro T hT_mem hgate
   have hT : T = ceTrans := ceTrans_eq_of_mem hT_mem
   subst hT
-  refine ⟨?_, ?_⟩ <;> simp [rev1A, rev1B, ceTrans]
+  refine ⟨?_, ?_⟩ <;> simp [ptcA, ptcB, ceTrans]
 
-private lemma cap_rev1 : CAP rev1A rev1B :=
-  con_rev0_implies_cap rev1A rev1B con_rev1B rev0_rev1
+private lemma cap_ptc : CAP ptcA ptcB :=
+  con_adb_implies_cap ptcA ptcB con_ptcB adb_ptc
 
-private lemma ddc_rev1 : DDC rev1A rev1B := by
+private lemma ddc_ptc : DDC ptcA ptcB := by
   intro v hdisconn
   rcases ceNodes_cases v with rfl | rfl | rfl
-  · exact False.elim <| hdisconn ceSource (by simp [rev1B]) <|
-      Connected.step ⟨ceTrans, ceTrans_mem, ceTrans_on_rev1A, Or.inr ⟨rfl, rfl⟩⟩ (Connected.refl _)
-  · exact False.elim <| hdisconn ceGate (by simp [rev1B]) (Connected.refl _)
-  · exact False.elim <| hdisconn ceSource (by simp [rev1B]) (Connected.refl _)
+  · exact False.elim <| hdisconn ceSource (by simp [ptcB]) <|
+      Connected.step ⟨ceTrans, ceTrans_mem, ceTrans_on_ptcA, Or.inr ⟨rfl, rfl⟩⟩ (Connected.refl _)
+  · exact False.elim <| hdisconn ceGate (by simp [ptcB]) (Connected.refl _)
+  · exact False.elim <| hdisconn ceSource (by simp [ptcB]) (Connected.refl _)
 
-private lemma not_rev1_rev1 : ¬ PTC rev1A rev1B := by
+private lemma not_ptc_ptc : ¬ PTC ptcA ptcB := by
   intro hPTC
-  have hchg : rev1A.val ceDrain ≠ rev1B.val ceDrain := by
-    simp [rev1A, rev1B]
+  have hchg : ptcA.val ceDrain ≠ ptcB.val ceDrain := by
+    simp [ptcA, ptcB]
   obtain ⟨_, ⟨q, hqpow, hAB⟩⟩ := hPTC ceDrain hchg
   rcases ceNodes_cases q with rfl | rfl | rfl
   · exact hqpow rfl
-  · have : ConnectedIn rev1B ceDrain ceGate := hAB.2
-    have hEq : ceDrain = ceGate := connected_eq_of_ceTrans_off ceTrans_off_rev1B this
+  · have : ConnectedIn ptcB ceDrain ceGate := hAB.2
+    have hEq : ceDrain = ceGate := connected_eq_of_ceTrans_off ceTrans_off_ptcB this
     exact ceDrain_ne_gate hEq
-  · have : ConnectedIn rev1B ceDrain ceSource := hAB.2
-    have hEq : ceDrain = ceSource := connected_eq_of_ceTrans_off ceTrans_off_rev1B this
+  · have : ConnectedIn ptcB ceDrain ceSource := hAB.2
+    have hEq : ceDrain = ceSource := connected_eq_of_ceTrans_off ceTrans_off_ptcB this
     exact ceDrain_ne_source hEq
 
 /-- There exist compliant states satisfying `CON`, `DDC`, and `CAP` but violating `ADB`. -/
-theorem exists_con_ddc_cap_not_rev0 :
+theorem exists_con_ddc_cap_not_adb :
     ∃ (net : Net) (A B : State net),
       CON B B ∧ DDC A B ∧ CAP A B ∧ ¬ ADB A B := by
-  refine ⟨ceNet, rev0A, rev0B, con_rev0B, ddc_rev0, cap_rev0, not_rev0_rev0⟩
+  refine ⟨ceNet, adbA, adbB, con_adbB, ddc_adb, cap_adb, not_adb_adb⟩
 
 /-- There exist compliant states satisfying `CON`, `DDC`, and `CAP` but violating `PTC`. -/
-theorem exists_con_ddc_cap_not_rev1 :
+theorem exists_con_ddc_cap_not_ptc :
     ∃ (net : Net) (A B : State net),
       CON B B ∧ DDC A B ∧ CAP A B ∧ ¬ PTC A B := by
-  refine ⟨ceNet, rev1A, rev1B, con_rev1B, ddc_rev1, cap_rev1, not_rev1_rev1⟩
+  refine ⟨ceNet, ptcA, ptcB, con_ptcB, ddc_ptc, cap_ptc, not_ptc_ptc⟩

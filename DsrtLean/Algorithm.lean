@@ -116,7 +116,7 @@ theorem validNextState_implies_validFloodFill {net : Net} (A B : State net)
   ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1⟩
 
 -- Supplying ADB and PTC on top of ValidFloodFill recovers ValidNextState.
-theorem validFloodFill_rev0_rev1 {net : Net} (A B : State net)
+theorem validFloodFill_adb_ptc {net : Net} (A B : State net)
     (powered : net.nodes → Option Value)
     (hVF : ValidFloodFill A B powered) (hR0 : ADB A B) (hR1 : PTC A B) :
     ValidNextState A B powered :=
@@ -127,15 +127,15 @@ theorem validFloodFill_rev0_rev1 {net : Net} (A B : State net)
 /-- The result of a single simulation timestep.
   - `ok B`: successful transition to state `B`
   - `shortCircuit v`: opposite-polarity drives conflict at node `v`
-  - `rev0Error T`: transistor `T` switches while its endpoints disagree (weak reversibility violated)
-  - `rev1Error v`: node `v` changes value without an AB-connected charge path (path-to-charge violated)
+  - `adbError T`: transistor `T` switches while its endpoints disagree (weak reversibility violated)
+  - `ptcError v`: node `v` changes value without an AB-connected charge path (path-to-charge violated)
 -/
 inductive SimResult (net : Net) where
   | ok           : State net → SimResult net
   | shortCircuit : net.nodes → SimResult net
   | staticError  : net.nodes → SimResult net
-  | rev0Error    : Transistor net.nodes → SimResult net
-  | rev1Error    : net.nodes → SimResult net
+  | adbError     : Transistor net.nodes → SimResult net
+  | ptcError     : net.nodes → SimResult net
 
 /-! ## Simulation step relation -/
 
@@ -145,8 +145,8 @@ inductive SimResult (net : Net) where
     pseudocode.
 
     - `shortCircuit`: flood fill detects conflicting drives (phase 1 fails)
-    - `rev0Error`:    flood fill succeeded; ADB check fails (phase 4 fails)
-    - `rev1Error`:    ADB passed; PTC check fails (phase 5 fails)
+    - `adbError`:     flood fill succeeded; ADB check fails (phase 4 fails)
+    - `ptcError`:     ADB passed; PTC check fails (phase 5 fails)
     - `ok`:           all phases passed
 
     Correctness theorems (soundness, per-error impossibility, completeness, uniqueness)
@@ -170,24 +170,24 @@ inductive SimStepRelation {net : Net} (requireStatic : Bool)
       SimStepRelation requireStatic A powered (.staticError v)
   /-- Phases 1–3 succeeded; phase 4 (ADB check) failed.
       T witnesses the violation: the conditions are exactly ¬ (T's contribution to ADB A B). -/
-  | rev0Error {B : State net} {T : Transistor net.nodes} :
+  | adbError {B : State net} {T : Transistor net.nodes} :
       ¬ ShortCircuit A powered →
       ValidFloodFill A B powered →
       T ∈ net.transistors →
       logic (A.val T.gate) ≠ logic (B.val T.gate) →
       (A.val T.source ≠ A.val T.drain ∨ B.val T.source ≠ B.val T.drain) →
-      SimStepRelation requireStatic A powered (.rev0Error T)
+      SimStepRelation requireStatic A powered (.adbError T)
   /-- Phases 1–4 succeeded; phase 5 (PTC check) failed.
       v witnesses the violation: A.val v ≠ B.val v and v lacks an AB-connected charge path.
       The two disjuncts correspond to the two halves of the PTC conjunction. -/
-  | rev1Error {B : State net} {v : net.nodes} :
+  | ptcError {B : State net} {v : net.nodes} :
       ¬ ShortCircuit A powered →
       ValidFloodFill A B powered →
       ADB A B →
       A.val v ≠ B.val v →
       ((∀ p, A.powered p ≠ none → ¬ ABConnected A B v p) ∨
        (∀ q, B.powered q ≠ none → ¬ ABConnected A B v q)) →
-      SimStepRelation requireStatic A powered (.rev1Error v)
+      SimStepRelation requireStatic A powered (.ptcError v)
   /-- All phases succeeded. -/
   | ok {B : State net} :
       ¬ ShortCircuit A powered →
