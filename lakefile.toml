@@ -1,0 +1,10 @@
+name = "DsrtLean"
+version = "0.1.0"
+defaultTargets = ["DsrtLean"]
+
+[[lean_lib]]
+name = "DsrtLean"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
